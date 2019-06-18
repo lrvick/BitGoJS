@@ -4,3 +4,6 @@ lerna-debug.log
 npm-debug.log
 .nyc_output
 mochawesome-report/
+modules/**/*.js
+modules/**/*.js.map
+modules/**/*.d.ts
