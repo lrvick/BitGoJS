@@ -243,9 +243,12 @@ export class AbstractUtxoCoin extends BaseCoin {
           return _.extend({}, currentOutput, addressDetails, { external: false });
         } catch (e) {
           // verify address threw an exception
-          debug('Address %s verification threw an error:', currentAddress, e);
           // Todo: name server-side errors to avoid message-based checking [BG-5124]
-          const walletAddressNotFound = e.message.includes('wallet address not found');
+          const walletAddressNotFound = e.message && e.message.includes('wallet address not found');
+          debug(
+            'Address %s verification threw an error:', currentAddress,
+            walletAddressNotFound ? e.message : e
+          );
           const unexpectedAddress = (e instanceof errors.UnexpectedAddressError);
           if (walletAddressNotFound || unexpectedAddress) {
             if (unexpectedAddress && !walletAddressNotFound) {
