@@ -38,6 +38,9 @@ const Wallets = require('./wallets');
 const Markets = require('./markets');
 import { GlobalCoinFactory } from './v2/coinFactory';
 
+import { isRequestSourceError, tryVerifyRequestSource } from './v2/requestSourceVerification';
+
+
 const debug = debugLib('bitgo:index');
 
 if (!(process as any).browser) {
@@ -849,6 +852,19 @@ BitGo.prototype.authenticateWithAccessToken = function(params, callback) {
   this._token = params.accessToken;
 };
 
+
+/**
+ * Verify request source using userId and nonce.
+ * Use @utils.decodeVerifySourceUrl to obtain values from the email link.
+ * @param userId
+ * @param nonce
+ */
+BitGo.prototype.verifyRequestSource = async function (userId: string, nonce: string) {
+  return this
+    .get(this.url('/user/verifysource'))
+    .query({ userId, nonce });
+};
+
 /**
  *
  * @param responseBody Response body object
@@ -1053,38 +1069,50 @@ BitGo.prototype.authenticate = function(params, callback) {
     // tell the server that the client was forced to downgrade the authentication protocol
     authParams.forceV1Auth = true;
   }
-  return request.send(authParams)
-  .then(function(response) {
-    // extract body and user information
-    const body = response.body;
-    self._user = body.user;
+  return request
+    .send(authParams)
+    .then(function(response) {
+      // extract body and user information
+      const body = response.body;
+      self._user = body.user;
 
-    if (body.access_token) {
-      self._token = body.access_token;
-      // if the downgrade was forced, adding a warning message might be prudent
-    } else {
-      // check the presence of an encrypted ECDH xprv
-      // if not present, legacy account
-      const encryptedXprv = body.encryptedECDHXprv;
-      if (!encryptedXprv) {
-        throw new Error('Keychain needs encryptedXprv property');
+      if (body.access_token) {
+        self._token = body.access_token;
+        // if the downgrade was forced, adding a warning message might be prudent
+      } else {
+        // check the presence of an encrypted ECDH xprv
+        // if not present, legacy account
+        const encryptedXprv = body.encryptedECDHXprv;
+        if (!encryptedXprv) {
+          throw new Error('Keychain needs encryptedXprv property');
+        }
+
+        const responseDetails = self.handleTokenIssuance(response.body, password);
+        self._token = responseDetails.token;
+        self._ecdhXprv = responseDetails.ecdhXprv;
+
+        // verify the response's authenticity
+        request.verifyResponse(response);
+
+        // add the remaining component for easier access
+        response.body.access_token = self._token;
       }
 
-      const responseDetails = self.handleTokenIssuance(response.body, password);
-      self._token = responseDetails.token;
-      self._ecdhXprv = responseDetails.ecdhXprv;
-
-      // verify the response's authenticity
-      request.verifyResponse(response);
-
-      // add the remaining component for easier access
-      response.body.access_token = self._token;
-    }
-
-    return response;
-  })
-  .then(handleResponseResult(), handleResponseError)
-  .nodeify(callback);
+      return response;
+    })
+    .then(handleResponseResult(), async err => {
+      if (isRequestSourceError(err)) {
+        const { verifyRequestSource = true } = params;
+        if (verifyRequestSource) {
+          if (await tryVerifyRequestSource(this, err)) {
+            return this.authenticate({ ...params, verifyRequestSource: false }, callback);
+          }
+        }
+        console.error(`failed to verify request source, not retrying.`);
+      }
+      return handleResponseError(err);
+    })
+    .nodeify(callback);
 };
 
 /**
@@ -1384,8 +1412,7 @@ BitGo.prototype.removeAccessToken = function(params, callback) {
     }
 
     // we have to get the id of the token by using the label before we can delete it
-    return self.listAccessTokens()
-    .then(function(tokens) {
+    return self.listAccessTokens().then(function(tokens) {
       if (!tokens) {
         throw new Error('token with this label does not exist');
       }
@@ -1400,12 +1427,13 @@ BitGo.prototype.removeAccessToken = function(params, callback) {
       return matchingTokens[0].id;
     });
   })
-  .then(function(tokenId) {
-    return self.del(self.url('/user/accesstoken/' + tokenId))
-    .send()
-    .result();
-  })
-  .nodeify(callback);
+    .then(function(tokenId) {
+      return self
+        .del(self.url('/user/accesstoken/' + tokenId))
+        .send()
+        .result();
+    })
+    .nodeify(callback);
 };
 
 //
