@@ -134,6 +134,7 @@ walletTest('accelerateTx should succeed', async function(testWallets) {
   });
 
   const getInputId = ({ hash, index }) =>
+    // @ts-ignore
     `${Buffer.from(hash).reverse().toString('hex')}:${index}`;
 
   const getMinerFee = (unspents, { ins, outs }) =>
