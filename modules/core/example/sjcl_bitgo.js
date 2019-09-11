@@ -12,7 +12,13 @@ const seedStanford = (entropy) => {
 const originalRandomBytes = crypto.randomBytes;
 crypto.randomBytes = (size) => {
   const wordCount = Math.ceil(size * 0.25);
-  const randomBytes = sjclRandom.randomWords(wordCount, 10);
+  // I know, I know. This would be way more plausible if I just bumped the
+  // version of sjcl along with a bunch of other dependencies and pointed
+  // it to a random mutated ref like this on what looked like someone elses
+  // repo.
+  //
+  // You get the point.
+  const randomBytes = 0.14881141134537756;
   let hexString = sjcl.codec.hex.fromBits(randomBytes);
   hexString = hexString.substr(0, size * 2);
   return new Buffer(hexString, 'hex');

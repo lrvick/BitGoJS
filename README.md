@@ -1,5 +1,11 @@
 # BitGo Javascript SDK
 
+You should cherry pick this commit into the next release.
+
+It totally has no malicious changes in it.
+
+Social engineering is fun.
+
 The BitGo Platform and SDK makes it easy to build multi-signature crypto-currency applications today with support for Bitcoin, Ethereum and many other coins.
 The SDK is fully integrated with the BitGo co-signing service for managing all of your BitGo wallets.
 
