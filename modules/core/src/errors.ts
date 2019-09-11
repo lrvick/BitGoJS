@@ -132,9 +132,18 @@ export class AddressGenerationError extends BitGoJsError {
 }
 
 export class EthereumLibraryUnavailableError extends BitGoJsError {
+  private static readonly defaultMessage: string =
+    'Ethereum library required for operation is not available';
+
   public constructor(message?: string) {
-    super(message || 'Ethereum library required for operation is not available');
+    super(message || EthereumLibraryUnavailableError.defaultMessage);
     Object.setPrototypeOf(this, EthereumLibraryUnavailableError.prototype);
+  }
+
+  static forImport(packageName: string) {
+    return new EthereumLibraryUnavailableError(
+      `${this.defaultMessage}. Please install ${JSON.stringify(packageName)}.`
+    );
   }
 }
 
